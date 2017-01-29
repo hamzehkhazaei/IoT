@@ -67,7 +67,7 @@ plot    monitor_file using 11 with lines axis x1y1 linestyle 11 title "CORE-Spar
         monitor_file using 19 with lines axis x1y1 linestyle 13 title "CORE-Cassandra-Cont", \
 
 
-set xrange [0:50]
+set xrange [0:85]
 set size 0.99, 0.33
 set boxwidth 0.2
 set style fill solid
@@ -76,7 +76,7 @@ set y2label "Cont-RT (ms)" font "Arial, 10" offset -1
 set format y "%2.0f"
 set yrange [0:200]
 set ytics 50
-set y2range [0:400]
+set y2range [0:500]
 set y2tics 100
 set xtics border in scale 0,0 nomirror rotate by -45  autojustify font "Arial, 8"
 set xtics  norangelimit 
