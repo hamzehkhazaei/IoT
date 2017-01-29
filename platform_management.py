@@ -500,7 +500,7 @@ def deploy_rabbitmq():
 def deploy_vis_monomarks():
     global swarm_master_ip
     swarm_master_ip = get_swarm_master_ip()
-    print("\nDeploying the MonoMark Visualization ...")
+    print("\nDeploying the MonoMarks Visualization ...")
     command = ["sudo", "docker", "service", "create", "--name", "viz",
                "--publish=5000:8080/tcp", "--constraint", "node.labels.role==" + manager_role,
                "--mount=type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock",

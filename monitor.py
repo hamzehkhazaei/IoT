@@ -1,7 +1,7 @@
 import threading
 import time
 
-import infrastructure_management as ci
+import platform_management as pm
 from util import Util
 
 metrics_file = './output/monitor.txt'
@@ -15,10 +15,10 @@ def print_green(prt): print("\033[92m {}\033[00m".format(prt))
 
 
 def init_monitoring():
-    headers = ['Time', 'CORE-spark-VM', 'CG-spark-VM', 'CT-spark-VM', 'VC-spark-VM',
-               'CORE-kafka-VM', 'CG-kafka-VM', 'CT-kafka-VM', 'VC-kafka-VM', 'CORE-cassandra-VM',
-               'CORE-spark-cont', 'CG-spark-cont', 'CT-spark-cont', 'VC-spark-cont',
-               'CORE-kafka-cont', 'CG-kafka-cont', 'CT-kafka-cont', 'VC-kafka-cont',
+    headers = ['Time', 'CORE-spark-VM', 'CG-spark-VM', 'CT-spark-VM', 'WT-spark-VM',
+               'CORE-kafka-VM', 'CG-kafka-VM', 'CT-kafka-VM', 'WT-kafka-VM', 'CORE-cassandra-VM',
+               'CORE-spark-cont', 'CG-spark-cont', 'CT-spark-cont', 'WT-spark-cont',
+               'CORE-kafka-cont', 'CG-kafka-cont', 'CT-kafka-cont', 'WT-kafka-cont',
                'CORE-cassandra-cont']
     rt_headers = ['Time', 'Resp-Time-VM', 'Resp-Time-cont', 'Region', 'Flavor', 'Role', 'Name']
 
@@ -47,8 +47,8 @@ def get_vm_metrics():
     no_spark_vms = [0] * len(init_workers_name)
     no_kafka_vms = [0] * len(init_aggs_name)
     no_db_vms = [0] * len(init_dbs_name)
-    ip = ci.get_swarm_master_ip()
-    shell = ci.ssh_to(ip, 'ubuntu', ci.swarm_master_name)
+    ip = pm.get_swarm_master_ip()
+    shell = pm.ssh_to(ip, 'ubuntu', pm.swarm_master_name)
     with shell:
         result = shell.run(["sudo", "docker", "node", "ls"], store_pid="True", allow_error=True, encoding="utf8")
         if result.return_code > 0:
@@ -81,11 +81,11 @@ def get_cont_metrics():
     no_db_cont = [0] * len(init_dbs_name)
 
     for i in range(0, len(init_workers_name)):
-        no_spark_cont[i] = ci.get_no_replicas(init_workers_name[i])
-        no_kafka_cont[i] = ci.get_no_replicas(init_aggs_name[i])
+        no_spark_cont[i] = pm.get_no_replicas(init_workers_name[i])
+        no_kafka_cont[i] = pm.get_no_replicas(init_aggs_name[i])
 
     for i in range(0, len(init_dbs_name)):
-        no_db_cont[i] = ci.get_no_replicas(init_dbs_name[i])
+        no_db_cont[i] = pm.get_no_replicas(init_dbs_name[i])
 
     metrics.extend(no_spark_cont)
     metrics.extend(no_kafka_cont)
@@ -123,7 +123,7 @@ def log_rt_metrics(rt_metrics):
 
 
 def do_monitoring(interval=default_interval_sec):
-    ci.init(False)
+    pm.init(False)
     while True:
         log_metrics()
         print_green("\nLogged at: " + time.strftime("%Y-%m-%d.%H-%M-%S", time.localtime()))

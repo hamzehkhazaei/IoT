@@ -3,14 +3,14 @@ import time
 
 import pika
 
-import infrastructure_management as im
+import platform_management as pm
 
-connection = pika.BlockingConnection(pika.ConnectionParameters(im.controller_ip))
+connection = pika.BlockingConnection(pika.ConnectionParameters(pm.controller_ip))
 channel = connection.channel()
 channel.queue_declare(queue='qiot')
 
 count = 0
-regions = im.regions_name
+regions = pm.regions_name
 mean_arr_time_aggs = 10
 
 while True:

@@ -1,6 +1,6 @@
 import pika
 
-import infrastructure_management as im
+import platform_management as im
 from autonomic_manager import scale_kafka_service, init
 
 
