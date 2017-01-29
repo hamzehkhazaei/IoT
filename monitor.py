@@ -15,10 +15,10 @@ def print_green(prt): print("\033[92m {}\033[00m".format(prt))
 
 
 def init_monitoring():
-    headers = ['Time', 'CORE-spark-VM', 'CG-spark-VM', 'CT-spark-VM', 'WT-spark-VM',
-               'CORE-kafka-VM', 'CG-kafka-VM', 'CT-kafka-VM', 'WT-kafka-VM', 'CORE-cassandra-VM',
-               'CORE-spark-cont', 'CG-spark-cont', 'CT-spark-cont', 'WT-spark-cont',
-               'CORE-kafka-cont', 'CG-kafka-cont', 'CT-kafka-cont', 'WT-kafka-cont',
+    headers = ['Time', 'CORE-spark-VM', 'CG-spark-VM', 'CT-spark-VM', 'VC-spark-VM',
+               'CORE-kafka-VM', 'CG-kafka-VM', 'CT-kafka-VM', 'VC-kafka-VM', 'CORE-cassandra-VM',
+               'CORE-spark-cont', 'CG-spark-cont', 'CT-spark-cont', 'VC-spark-cont',
+               'CORE-kafka-cont', 'CG-kafka-cont', 'CT-kafka-cont', 'VC-kafka-cont',
                'CORE-cassandra-cont']
     rt_headers = ['Time', 'Resp-Time-VM', 'Resp-Time-cont', 'Region', 'Flavor', 'Role', 'Name']
 

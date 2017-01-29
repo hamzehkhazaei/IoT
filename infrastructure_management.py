@@ -65,6 +65,9 @@ cassandra_memory_limit = '3G'
 cassandra_overlay_network_name = "cassandra"
 flavors_name_datastore = [large_flavor]
 
+# visualization on WaveCloud
+wavecloud_token = "hr1px97yozs5qw3gw33onsjykm9kh4of"
+
 master_shell = ''
 controller_shell = ''
 
@@ -494,10 +497,10 @@ def deploy_rabbitmq():
         print("Both username and password are: guest")
 
 
-def deploy_visualization_tool():
+def deploy_vis_monomarks():
     global swarm_master_ip
     swarm_master_ip = get_swarm_master_ip()
-    print("\nDeploying the Visualization tool ...")
+    print("\nDeploying the MonoMark Visualization ...")
     command = ["sudo", "docker", "service", "create", "--name", "viz",
                "--publish=5000:8080/tcp", "--constraint", "node.labels.role==" + manager_role,
                "--mount=type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock",
@@ -507,6 +510,32 @@ def deploy_visualization_tool():
         print(result.stderr_output)
     else:
         print("\nIoT Platform Console:", "http://" + swarm_master_ip + ":5000")
+
+
+def deploy_vis_wavecloud():
+    global swarm_master_ip
+    swarm_master_ip = get_swarm_master_ip()
+    cg_ip = get_node_ip('cg-worker')
+    print("\nDeploying the WaveCloud Visualization ...")
+    command_1 = ["sudo", "curl", "-L", "git.io/scope", "-o", "/usr/local/bin/scope"]
+    command_2 = ["sudo", "chmod", "a+x", "/usr/local/bin/scope"]
+    command_3 = ["sudo", "scope", "launch", "--service-token=", wavecloud_token]
+    shell = ssh_to(cg_ip, 'ubuntu', 'cg-worker')
+    result = shell.run(command_1, store_pid="True", allow_error=True, encoding="utf8")
+
+    # result = master_shell.run(command_1, store_pid="True", allow_error=True, encoding="utf8")
+    if result.return_code > 0:
+        print(result.stderr_output)
+    else:
+        result = shell.run(command_2, store_pid="True", allow_error=True, encoding="utf8")
+        if result.return_code > 0:
+            print(result.stderr_output)
+        else:
+            result = shell.run(command_3, store_pid="True", allow_error=True, encoding="utf8")
+            if result.return_code > 0:
+                print(result.stderr_output)
+            else:
+                print("\nIoT Platform Wave Cloud Dashboard:", "http://cloud.weave.works")
 
 
 def inspect_service(service_name):
@@ -673,6 +702,7 @@ def redeploy_services():
 def create_iot_platform():
     t1 = time.time()
     init(is_creation_time=True)
+    monitor.init_monitoring()
     provision_cluster()
     create_swarm_cluster()
     label_nodes()
@@ -680,7 +710,8 @@ def create_iot_platform():
     deploy_kafka()
     deploy_rabbitmq()
     deploy_cassandra()
-    deploy_visualization_tool()
+    deploy_vis_monomarks()
+    # deploy_vis_wavecloud()
     t2 = time.time()
     print("\n\nInfrastructure has been provisioned in (seconds): ", t2 - t1)
 
@@ -720,6 +751,7 @@ def clean_up_everything():
     else:
         print("So, you are not sure. :-)")
 
+
 if __name__ == "__main__":
     create_iot_platform()
     # remove_iot_platform()
@@ -727,3 +759,4 @@ if __name__ == "__main__":
     # down_scale_swarm_cluster_to_initial_state()
     # clean_up_everything()
     # print(get_region_and_status("core-agg"))
+    # deploy_vis_wavecloud()
