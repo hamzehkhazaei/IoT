@@ -93,5 +93,5 @@ plot    monitor_file using 5 with lines axis x1y1 linestyle 1 title "WT-Spark-VM
         monitor_file using 18 with lines axis x1y2 linestyle 12 title "WT-Kafka-Cont", \
 
 unset multiplot
-# pause 5
-# reread
+pause 5
+reread

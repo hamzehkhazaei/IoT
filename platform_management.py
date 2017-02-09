@@ -40,7 +40,7 @@ manager_role = "manager"
 
 # Spark info
 #  do not change this, as other names don't work.
-spark_overlay_network_name = "spark"
+spark_overlay_network_name = 'spark'
 spark_master_name = "master"
 spark_memory_reserve = '1G'
 spark_memory_limit = '1250M'
@@ -66,7 +66,7 @@ cassandra_overlay_network_name = "cassandra"
 flavors_name_datastore = [large_flavor]
 
 # visualization on WaveCloud
-wavecloud_token = "hr1px97yozs5qw3gw33onsjykm9kh4of"
+wavecloud_token = 'hr1px97yozs5qw3gw33onsjykm9kh4of'
 
 master_shell = ''
 controller_shell = ''
@@ -397,7 +397,7 @@ def deploy_spark_cluster():
     swarm_master_ip = get_swarm_master_ip()
     create_overlay_network(spark_overlay_network_name)
     command = ["sudo", "docker", "service", "create", "--name", spark_master_name,
-               "--network", spark_overlay_network_name,
+               "--network", "spark",
                "--constraint", "node.labels.role==" + manager_role,
                "-p", "7077:7077", "-p", "8080:8080",
                "--reserve-memory", spark_memory_reserve, "--limit-memory", spark_memory_limit,
@@ -498,8 +498,7 @@ def deploy_rabbitmq():
 
 
 def deploy_vis_monomarks():
-    global swarm_master_ip
-    swarm_master_ip = get_swarm_master_ip()
+    master_ip = get_swarm_master_ip()
     print("\nDeploying the MonoMarks Visualization ...")
     command = ["sudo", "docker", "service", "create", "--name", "viz",
                "--publish=5000:8080/tcp", "--constraint", "node.labels.role==" + manager_role,
@@ -509,33 +508,43 @@ def deploy_vis_monomarks():
     if result.return_code > 0:
         print(result.stderr_output)
     else:
-        print("\nIoT Platform Console:", "http://" + swarm_master_ip + ":5000")
+        print("\nIoT Platform Console:", "http://" + master_ip + ":5000")
 
 
 def deploy_vis_wavecloud():
-    global swarm_master_ip
-    swarm_master_ip = get_swarm_master_ip()
-    cg_ip = get_node_ip('cg-worker')
-    print("\nDeploying the WaveCloud Visualization ...")
-    command_1 = ["sudo", "curl", "-L", "git.io/scope", "-o", "/usr/local/bin/scope"]
-    command_2 = ["sudo", "chmod", "a+x", "/usr/local/bin/scope"]
-    command_3 = ["sudo", "scope", "launch", "--service-token=", wavecloud_token]
-    shell = ssh_to(cg_ip, 'ubuntu', 'cg-worker')
-    result = shell.run(command_1, store_pid="True", allow_error=True, encoding="utf8")
+    connect_node_to_wavecloud(get_node_ip(swarm_master_name), swarm_master_name)
 
-    # result = master_shell.run(command_1, store_pid="True", allow_error=True, encoding="utf8")
-    if result.return_code > 0:
-        print(result.stderr_output)
-    else:
-        result = shell.run(command_2, store_pid="True", allow_error=True, encoding="utf8")
+    for worker_name in initial_workers_name:
+        connect_node_to_wavecloud(get_node_ip(worker_name), worker_name)
+
+    for agg_name in initial_aggs_name:
+        connect_node_to_wavecloud(get_node_ip(agg_name), agg_name)
+
+    for db_name in initial_db_name:
+        connect_node_to_wavecloud(get_node_ip(db_name), db_name)
+
+
+def connect_node_to_wavecloud(node_ip, node_name):
+    # print("\nDeploying the WaveCloud Visualization ...")
+    shell = ssh_to(node_ip, ssh_user, node_name)
+    with shell:
+        result = shell.run(["sudo", "curl", "-L", "git.io/scope", "-o", "/usr/local/bin/scope"],
+                           store_pid="True", allow_error=True, encoding="utf8")
         if result.return_code > 0:
             print(result.stderr_output)
         else:
-            result = shell.run(command_3, store_pid="True", allow_error=True, encoding="utf8")
-            if result.return_code > 0:
-                print(result.stderr_output)
-            else:
-                print("\nIoT Platform Wave Cloud Dashboard:", "http://cloud.weave.works")
+            result = shell.run(["sudo", "chmod", "a+x", "/usr/local/bin/scope"],
+                               store_pid="True", allow_error=True, encoding="utf8")
+        if result.return_code > 0:
+            print(result.stderr_output)
+        else:  # the token should be hard coded; otherwise it is not gonna work; I need to find out why.
+            result = shell.run(["sudo", "scope", "launch", "--service-token=hr1px97yozs5qw3gw33onsjykm9kh4of"],
+                               store_pid="True", allow_error=True, encoding="utf8")
+        if result.return_code > 0:
+            print(result.stderr_output)
+        else:
+            print(node_name + " is connected to Wave Cloud.")
+            # print("\nIoT Platform Wave Cloud Dashboard:", "http://cloud.weave.works")
 
 
 def inspect_service(service_name):
@@ -711,7 +720,7 @@ def create_iot_platform():
     deploy_rabbitmq()
     deploy_cassandra()
     deploy_vis_monomarks()
-    # deploy_vis_wavecloud()
+    deploy_vis_wavecloud()
     t2 = time.time()
     print("\n\nInfrastructure has been provisioned in (seconds): ", t2 - t1)
 
@@ -753,10 +762,11 @@ def clean_up_everything():
 
 
 if __name__ == "__main__":
-    create_iot_platform()
+    init(False)
+    # create_iot_platform()
     # remove_iot_platform()
     # redeploy_services()
     # down_scale_swarm_cluster_to_initial_state()
     # clean_up_everything()
     # print(get_region_and_status("core-agg"))
-    # deploy_vis_wavecloud()
+    deploy_vis_wavecloud()

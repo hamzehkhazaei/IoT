@@ -67,7 +67,7 @@ plot    monitor_file using 11 with lines axis x1y1 linestyle 11 title "CORE-Spar
         monitor_file using 19 with lines axis x1y1 linestyle 13 title "CORE-Cassandra-Cont", \
 
 
-set xrange [0:85]
+set xrange [0:70]
 set size 0.99, 0.33
 set boxwidth 0.2
 set style fill solid
@@ -87,5 +87,5 @@ plot    rt_monitor_file using 2:xtic(4) with boxes axis x1y1 title "VM Response 
 
         
 unset multiplot
-# pause 7
-# reread
+pause 7
+reread
