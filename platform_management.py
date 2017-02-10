@@ -396,7 +396,7 @@ def deploy_spark_cluster():
     global swarm_master_ip
     swarm_master_ip = get_swarm_master_ip()
     create_overlay_network(spark_overlay_network_name)
-    command = ["sudo", "docker", "service", "create", "--name", spark_master_name,
+    command = ["sudo", "docker", "service", "create", "--name", "master",
                "--network", "spark",
                "--constraint", "node.labels.role==" + manager_role,
                "-p", "7077:7077", "-p", "8080:8080",
@@ -512,6 +512,8 @@ def deploy_vis_monomarks():
 
 
 def deploy_vis_wavecloud():
+    print("Deploying the WaveCloud Visualization ...")
+    init(False)
     connect_node_to_wavecloud(get_node_ip(swarm_master_name), swarm_master_name)
 
     for worker_name in initial_workers_name:
@@ -523,9 +525,10 @@ def deploy_vis_wavecloud():
     for db_name in initial_db_name:
         connect_node_to_wavecloud(get_node_ip(db_name), db_name)
 
+    print("\nIoT Platform Wave Cloud Dashboard:", "http://cloud.weave.works")
+
 
 def connect_node_to_wavecloud(node_ip, node_name):
-    # print("\nDeploying the WaveCloud Visualization ...")
     shell = ssh_to(node_ip, ssh_user, node_name)
     with shell:
         result = shell.run(["sudo", "curl", "-L", "git.io/scope", "-o", "/usr/local/bin/scope"],
@@ -544,7 +547,6 @@ def connect_node_to_wavecloud(node_ip, node_name):
             print(result.stderr_output)
         else:
             print(node_name + " is connected to Wave Cloud.")
-            # print("\nIoT Platform Wave Cloud Dashboard:", "http://cloud.weave.works")
 
 
 def inspect_service(service_name):
@@ -720,7 +722,6 @@ def create_iot_platform():
     deploy_rabbitmq()
     deploy_cassandra()
     deploy_vis_monomarks()
-    deploy_vis_wavecloud()
     t2 = time.time()
     print("\n\nInfrastructure has been provisioned in (seconds): ", t2 - t1)
 
@@ -762,11 +763,11 @@ def clean_up_everything():
 
 
 if __name__ == "__main__":
-    init(False)
-    # create_iot_platform()
+    # init(False)
+    create_iot_platform()
     # remove_iot_platform()
     # redeploy_services()
     # down_scale_swarm_cluster_to_initial_state()
     # clean_up_everything()
     # print(get_region_and_status("core-agg"))
-    deploy_vis_wavecloud()
+    # deploy_vis_wavecloud()
