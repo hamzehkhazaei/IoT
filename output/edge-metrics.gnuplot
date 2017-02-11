@@ -47,7 +47,7 @@ set grid front y2tics layerdefault linetype 1 dt 4 linewidth 1.000 linecolor rgb
 # set obj rectangle from 0,0 to 12,12 behind fillcolor rgb "#CCCCCC" fillstyle solid 1 noborder
 # set obj rectangle from 0,572 to 2000, 2000 behind fillcolor rgb "#E5A385" fillstyle solid 1 noborder
 
-set xrange [0:200]
+set xrange [0:180]
 set xtics 10
 
 set size 0.95, 0.32
@@ -93,5 +93,5 @@ plot    monitor_file using 5 with lines axis x1y1 linestyle 1 title "WT-Spark-VM
         monitor_file using 18 with lines axis x1y2 linestyle 12 title "WT-Kafka-Cont", \
 
 unset multiplot
-pause 5
-reread
+# pause 5
+# reread

@@ -8,6 +8,7 @@ import pika
 import spur
 
 from monitor import StartMonitoringThread, log_rt_metrics
+from platform_management import connect_node_to_wavecloud
 from util import Util
 
 auth_url = "http://iam.savitestbed.ca:5000/v2.0"
@@ -217,10 +218,10 @@ def scale_kafka_service(service_name, change):
                 scale_service(service_name, current_replicas + change)
             elif current_replicas + change <= small_vm_capacity * max_kafka_vm:
                 if provisioning_agg_on_region[provisioning_index] == 0:
-                    print_cyan("\nUtilization is high, requesting for a new VM.")
+                    print_cyan("Utilization is high, requesting for a new VM.")
                     scale_cluster(service_name, small_flavor, agg_role)
                 else:
-                    print_cyan("\nKafka: Utilization is high, request for a new VM has already been submitted: "
+                    print_cyan("Kafka: Utilization is high, request for a new VM has already been submitted: "
                                + service_name)
                     # agg_queue.put(service_name)
             else:
@@ -257,10 +258,10 @@ def scale_spark_service(service_name, change):
                 scale_service(service_name, current_replicas + change)
             elif current_replicas + change <= medium_vm_capacity * max_spark_vm:
                 if provisioning_worker_on_region[provisioning_index] == 0:
-                    print_cyan("\nSpark: Utilization is high, requesting for a new VM.")
+                    print_cyan("Spark: Utilization is high, requesting for a new VM.")
                     scale_cluster(service_name, medium_flavor, edge_worker_role)
                 else:
-                    print_cyan("\nSpark: Utilization is high, request for a new VM has already been submitted: "
+                    print_cyan("Spark: Utilization is high, request for a new VM has already been submitted: "
                                + service_name)
                     # edge_queue.put(service_name)
             else:
@@ -419,6 +420,7 @@ class ProvisionSwarmNodeThread(threading.Thread):
             create_vm(self.vm_name, self.user_name, self.flavor, self.image, self.region)
             join_node_to_swarm_cluster(get_node_ip(self.vm_name), self.vm_name)
             label_a_node(self.vm_name, self.region, self.role)
+            connect_node_to_wavecloud(get_node_ip(self.vm_name), self.vm_name)
             print_cyan(self.vm_name + " is up and running with latest docker engine ...")
 
             if self.role == edge_worker_role:
@@ -539,8 +541,8 @@ if __name__ == "__main__":
     monitor_thread = StartMonitoringThread()
     monitor_thread.setDaemon(True)  # this way, whenever the main program exit, monitoring thread will stop as well.
     monitor_thread.start()
-    time.sleep(30)
-    modify = -1
+    time.sleep(3)
+    modify = 1
     while True:
         scale_kafka_service("wt-agg", modify)
         time.sleep(1)

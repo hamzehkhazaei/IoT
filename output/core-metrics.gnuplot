@@ -1,5 +1,5 @@
 reset
-monitor_file = 'monitor.txt'
+monitor_file = 'monitor-exp1.txt'
 rt_monitor_file = 'rt_monitor.txt'
 
 # set terminal aqua size 625,250
@@ -45,7 +45,7 @@ set grid front ytics layerdefault linetype 1 dt 4 linewidth 1.000 linecolor rgb 
 # set obj rectangle from 0,0 to 12,12 behind fillcolor rgb "#CCCCCC" fillstyle solid 1 noborder
 # set obj rectangle from 0,572 to 2000, 2000 behind fillcolor rgb "#E5A385" fillstyle solid 1 noborder
 
-set xrange [0:200]
+set xrange [0:180]
 set xtics 10
 
 set size 0.91, 0.3
@@ -74,9 +74,9 @@ set style fill solid
 set ylabel "VM-RT (sec)" font "Arial, 10" offset 2
 set y2label "Cont-RT (ms)" font "Arial, 10" offset -1
 set format y "%2.0f"
-set yrange [0:200]
+set yrange [0:300]
 set ytics 50
-set y2range [0:500]
+set y2range [0:600]
 set y2tics 100
 set xtics border in scale 0,0 nomirror rotate by -45  autojustify font "Arial, 8"
 set xtics  norangelimit 
@@ -87,5 +87,5 @@ plot    rt_monitor_file using 2:xtic(4) with boxes axis x1y1 title "VM Response 
 
         
 unset multiplot
-pause 7
-reread
+# pause 7
+# reread

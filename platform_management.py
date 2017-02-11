@@ -764,8 +764,8 @@ def clean_up_everything():
 
 if __name__ == "__main__":
     # init(False)
-    create_iot_platform()
-    # remove_iot_platform()
+    # create_iot_platform()
+    remove_iot_platform()
     # redeploy_services()
     # down_scale_swarm_cluster_to_initial_state()
     # clean_up_everything()
