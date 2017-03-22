@@ -41,11 +41,10 @@ manager_role = "manager"
 # Spark info
 #  do not change this, as other names don't work.
 spark_overlay_network_name = 'spark'
-spark_master_name = "master"
 spark_memory_reserve = '1G'
 spark_memory_limit = '1250M'
 initial_workers_ip = []
-flavors_name_workers = [medium_flavor, medium_flavor, medium_flavor, medium_flavor]
+flavors_name_workers = [medium_flavor, medium_flavor, medium_flavor, medium_flavor, medium_flavor]
 initial_workers_name = []
 
 # Kafka info
@@ -54,7 +53,7 @@ initial_aggs_ip = []
 initial_aggs_name = []
 kafka_memory_reserve = '412M'
 kafka_memory_limit = '512M'
-flavors_name_aggs = [small_flavor, small_flavor, small_flavor, small_flavor]
+flavors_name_aggs = [small_flavor, small_flavor, small_flavor, small_flavor, small_flavor]
 
 # cassandra info
 ds_role = "iot-ds"
@@ -98,12 +97,16 @@ def synchronized(func):
     return synced_func
 
 
-def init(is_creation_time=False):
+def init(is_creation_time=False, local=False):
     global master_shell
     global controller_shell
+    global swarm_master_ip
     controller_shell = ssh_to(controller_ip)
-    if not is_creation_time:
-        master_shell = ssh_to(ip=get_swarm_master_ip(), user_name='ubuntu', node_name=swarm_master_name)
+    if not is_creation_time and not local:
+        swarm_master_ip = get_swarm_master_ip()
+        master_shell = ssh_to(swarm_master_ip, user_name='ubuntu', node_name=swarm_master_name)
+    elif local:
+        master_shell = ssh_to(controller_ip)
     load_initial_nodes_name()
 
 
@@ -258,7 +261,7 @@ def create_swarm_cluster():
     load_initial_aggs_ip()
     load_initial_ds_ip()
 
-    master_shell = ssh_to(ip=get_swarm_master_ip(), user_name='ubuntu', node_name=swarm_master_name)
+    master_shell = ssh_to(swarm_master_ip, user_name='ubuntu', node_name=swarm_master_name)
 
     result = master_shell.run(["sudo", "docker", "swarm", "init"], store_pid="True", encoding="utf8")
     if result.return_code > 0:
@@ -393,15 +396,15 @@ def deploy_spark_cluster():
     """
     print("\nDeploying the Spark cluster ...")
     err_flag = False
-    global swarm_master_ip
-    swarm_master_ip = get_swarm_master_ip()
     create_overlay_network(spark_overlay_network_name)
-    command = ["sudo", "docker", "service", "create", "--name", "master",
-               "--network", "spark",
+    command = ["sudo", "docker", "service", "create", "--name", "master", "--hostname", swarm_master_name,
+               "--network", spark_overlay_network_name,
                "--constraint", "node.labels.role==" + manager_role,
+               "-e", "NODE_TYPE=master",
                "-p", "7077:7077", "-p", "8080:8080",
                "--reserve-memory", spark_memory_reserve, "--limit-memory", spark_memory_limit,
                "gettyimages/spark:2.0.2-hadoop-2.7", "bin/spark-class", "org.apache.spark.deploy.master.Master"]
+
     result = master_shell.run(command, store_pid="True", allow_error=True, encoding="utf8")
     if result.return_code > 0:
         print(result.stderr_output)
@@ -412,10 +415,12 @@ def deploy_spark_cluster():
                    "--network", spark_overlay_network_name,
                    "--constraint", "node.labels.loc==" + regions_name[i],
                    "--constraint", "node.labels.role==" + edge_worker_role,
-                   "-p", "808" + str(i + 1) + ":8080",
+                   # "-p", "808" + str(i + 1) + ":8080",
+                   "-e", "NODE_TYPE=slave",
                    "--reserve-memory", spark_memory_reserve,
                    "--limit-memory", spark_memory_limit, "gettyimages/spark:2.0.2-hadoop-2.7", "bin/spark-class",
-                   "org.apache.spark.deploy.worker.Worker", "spark://" + swarm_master_ip + ":7077"]
+                   "org.apache.spark.deploy.worker.Worker",
+                   "spark://" + get_spark_master_ip("master") + ":7077"]
         result = master_shell.run(command, store_pid="True", allow_error=True, encoding="utf8")
         if result.return_code > 0:
             print(result.stderr_output)
@@ -471,20 +476,7 @@ def deploy_cassandra():
         print("Something went wrong with Cassandra configuration.")
 
 
-def scale_service(service_name, replicas):
-    print("\nScaling service: " + service_name + " to new size: " + str(replicas))
-    result = master_shell.run(
-        ["sudo", "docker", "service", "scale", service_name + "=" + str(replicas)],
-        store_pid="True", allow_error=True, encoding="utf8")
-    if result.return_code > 0:
-        print(result.stderr_output)
-    else:
-        print(service_name + " service has been scaled.")
-
-
 def deploy_rabbitmq():
-    global swarm_master_ip
-    swarm_master_ip = get_swarm_master_ip()
     print("\nDeploying the Rabbit-MQ ...")
     command = ["sudo", "docker", "service", "create", "--name", "rabbitmq",
                "--publish=5001:15672/tcp", "--constraint", "node.labels.role==" + manager_role,
@@ -498,37 +490,58 @@ def deploy_rabbitmq():
 
 
 def deploy_vis_monomarks():
-    master_ip = get_swarm_master_ip()
     print("\nDeploying the MonoMarks Visualization ...")
     command = ["sudo", "docker", "service", "create", "--name", "viz",
                "--publish=5000:8080/tcp", "--constraint", "node.labels.role==" + manager_role,
                "--mount=type=bind,src=/var/run/docker.sock,dst=/var/run/docker.sock",
-               "--reserve-memory", "512M", "--limit-memory", "2G", "manomarks/visualizer"]
+               "--reserve-memory", "512M", "--limit-memory", "1G", "manomarks/visualizer"]
     result = master_shell.run(command, store_pid="True", allow_error=True, encoding="utf8")
     if result.return_code > 0:
         print(result.stderr_output)
     else:
-        print("\nIoT Platform Console:", "http://" + master_ip + ":5000")
+        print("\nIoT Platform Console:", "http://" + swarm_master_ip + ":5000")
 
 
-def deploy_vis_wavecloud():
-    print("Deploying the WaveCloud Visualization ...")
-    init(False)
-    connect_node_to_wavecloud(get_node_ip(swarm_master_name), swarm_master_name)
+def deploy_vis_weave():
+    print("Deploying the Weave Dashboard ...")
+    init(is_creation_time=False)
+    thread = [ConnectToWeaveThread(swarm_master_ip, swarm_master_name, is_swarm_master=True)]
+
+    # connect_node_to_weave(get_node_ip(swarm_master_name), swarm_master_name, is_swarm_master=True)
 
     for worker_name in initial_workers_name:
-        connect_node_to_wavecloud(get_node_ip(worker_name), worker_name)
+        # connect_node_to_weave(get_node_ip(worker_name), worker_name)
+        thread.append(ConnectToWeaveThread(get_node_ip(worker_name), worker_name))
 
     for agg_name in initial_aggs_name:
-        connect_node_to_wavecloud(get_node_ip(agg_name), agg_name)
+        # connect_node_to_weave(get_node_ip(agg_name), agg_name)
+        thread.append(ConnectToWeaveThread(get_node_ip(agg_name), agg_name))
 
     for db_name in initial_db_name:
-        connect_node_to_wavecloud(get_node_ip(db_name), db_name)
+        # connect_node_to_weave(get_node_ip(db_name), db_name)
+        thread.append(ConnectToWeaveThread(get_node_ip(db_name), db_name))
 
-    print("\nIoT Platform Wave Cloud Dashboard:", "http://cloud.weave.works")
+    for i in range(0, len(thread)):
+        thread[i].start()
+
+    for i in range(0, len(thread)):
+        thread[i].join()
+
+    print("\nIoT Platform Weave Dashboard:", "http://" + swarm_master_ip + ":4040")
 
 
-def connect_node_to_wavecloud(node_ip, node_name):
+class ConnectToWeaveThread(threading.Thread):
+    def __init__(self, node_ip, node_name, is_swarm_master=False):
+        threading.Thread.__init__(self)
+        self.node_ip = node_ip
+        self.node_name = node_name
+        self.is_swarm_master = is_swarm_master
+
+    def run(self):
+        connect_node_to_weave(self.node_ip, self.node_name, self.is_swarm_master)
+
+
+def connect_node_to_weave(node_ip, node_name, is_swarm_master=False):
     shell = ssh_to(node_ip, ssh_user, node_name)
     with shell:
         result = shell.run(["sudo", "curl", "-L", "git.io/scope", "-o", "/usr/local/bin/scope"],
@@ -541,18 +554,43 @@ def connect_node_to_wavecloud(node_ip, node_name):
         if result.return_code > 0:
             print(result.stderr_output)
         else:  # the token should be hard coded; otherwise it is not gonna work; I need to find out why.
-            result = shell.run(["sudo", "scope", "launch", "--service-token=hr1px97yozs5qw3gw33onsjykm9kh4of"],
-                               store_pid="True", allow_error=True, encoding="utf8")
+            # this is for connecting to the weave cloud; I prefer the local setup. All probes send their report
+            # to the master node; then the Weave app at master node renders all reports from cluster and shows
+            # them in the browser at http://master_ip:4040.
+            # result = shell.run(["sudo", "scope", "launch", "--service-token=hr1px97yozs5qw3gw33onsjykm9kh4of"],
+            #                    store_pid="True", allow_error=True, encoding="utf8")
+            if is_swarm_master:
+                result = shell.run(["sudo", "scope", "launch"], store_pid="True", allow_error=True, encoding="utf8")
+            else:
+                result = shell.run(["sudo", "scope", "launch", swarm_master_ip],
+                                   store_pid="True", allow_error=True, encoding="utf8")
+
         if result.return_code > 0:
             print(result.stderr_output)
         else:
-            print(node_name + " is connected to Wave Cloud.")
+            print(node_name + " is connected to Weave Dashboard.")
 
 
-def inspect_service(service_name):
-    result = master_shell.run(["sudo", "docker", "service", "inspect", service_name], store_pid="True",
-                              allow_error=True,
-                              encoding="utf8")
+def scale_service(service_name, replicas):
+    print("\nScaling service: " + service_name + " to new size: " + str(replicas))
+    result = master_shell.run(
+        ["sudo", "docker", "service", "scale", service_name + "=" + str(replicas)],
+        store_pid="True", allow_error=True, encoding="utf8")
+    if result.return_code > 0:
+        print(result.stderr_output)
+    else:
+        print(service_name + " service has been scaled.")
+
+
+def inspect_service(service_name, sudo=True):
+    if sudo:
+        result = master_shell.run(["sudo", "docker", "service", "inspect", service_name], store_pid="True",
+                                  allow_error=True,
+                                  encoding="utf8")
+    else:
+        result = master_shell.run(["docker", "service", "inspect", service_name], store_pid="True",
+                                  allow_error=True,
+                                  encoding="utf8")
     if result.return_code > 0:
         print(result.stderr_output)
     else:
@@ -574,6 +612,13 @@ def get_no_replicas(service_name):
     service_json = json.loads(service_info, encoding='utf8')
     current_replicas = int(service_json[0]['Spec']['Mode']['Replicated']['Replicas'])
     return current_replicas
+
+
+def get_spark_master_ip(service_name):
+    service_info = inspect_service(service_name, sudo=True)
+    service_json = json.loads(service_info, encoding='utf8')
+    master_ip = str(service_json[0]['Endpoint']['VirtualIPs'][1]['Addr']).split('/')[0]
+    return master_ip
 
 
 def get_all_agg_replicas():
@@ -606,7 +651,7 @@ def remove_spark_service():
             ["sudo", "docker", "service", "rm", initial_workers_name[i]], store_pid="True", allow_error=True,
             encoding="utf8")
 
-    master_shell.run(["sudo", "docker", "service", "rm", spark_master_name], store_pid="True", allow_error=True,
+    master_shell.run(["sudo", "docker", "service", "rm", "master"], store_pid="True", allow_error=True,
                      encoding="utf8")
     master_shell.run(["sudo", "docker", "network", "rm", spark_overlay_network_name], store_pid="True",
                      allow_error=True, encoding="utf8")
@@ -670,13 +715,13 @@ def manipulate_services_replica(spark_master_rep=1, spark_worker_rep=1, kafka_re
     for i in range(0, len(initial_db_name)):
         scale_service(initial_db_name[i], cassandra_rep)
 
-    scale_service(spark_master_name, spark_master_rep)
+    scale_service("master", spark_master_rep)
     scale_service("rabbitmq", rabbit_rep)
     scale_service("viz", viz_rep)
 
 
 def down_scale_swarm_cluster_to_initial_state():
-    init(False)
+    init(is_creation_time=False)
     added_worker_nodes = util.load_worker_node_info()[0]
     added_agg_nodes = util.load_aggregators_node_info()[0]
 
@@ -701,6 +746,7 @@ def redeploy_services():
     then redeploy the services.
     :return:
     """
+    init(is_creation_time=False)
     load_initial_nodes_name()
     remove_spark_service()
     remove_kafka_service()
@@ -711,10 +757,12 @@ def redeploy_services():
 
 
 def create_iot_platform():
+    global swarm_master_ip
     t1 = time.time()
     init(is_creation_time=True)
     monitor.init_monitoring()
     provision_cluster()
+    swarm_master_ip = get_swarm_master_ip()  # we know which node is gonna be the master by its name.
     create_swarm_cluster()
     label_nodes()
     deploy_spark_cluster()
@@ -722,6 +770,7 @@ def create_iot_platform():
     deploy_rabbitmq()
     deploy_cassandra()
     deploy_vis_monomarks()
+    deploy_vis_weave()
     t2 = time.time()
     print("\n\nInfrastructure has been provisioned in (seconds): ", t2 - t1)
 
@@ -740,7 +789,7 @@ def remove_iot_platform():
     print("\n\nInfrastructure has been deprovisioned in (seconds): ", t2 - t1)
 
 
-def clean_up_everything():
+def hard_remove_iot_platform():
     global controller_shell
     print('Are you sure: (yes/no): ')
     ans = input()
@@ -763,11 +812,12 @@ def clean_up_everything():
 
 
 if __name__ == "__main__":
-    # init(False)
-    # create_iot_platform()
-    remove_iot_platform()
+    # init(False, local=False)
+    create_iot_platform()
+    # remove_iot_platform()
     # redeploy_services()
     # down_scale_swarm_cluster_to_initial_state()
-    # clean_up_everything()
+    # hard_remove_iot_platform()
     # print(get_region_and_status("core-agg"))
-    # deploy_vis_wavecloud()
+    # deploy_vis_weave()
+    # print(get_spark_master_ip("master"))

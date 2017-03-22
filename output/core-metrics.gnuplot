@@ -1,6 +1,6 @@
 reset
 monitor_file = 'monitor-exp1.txt'
-rt_monitor_file = 'rt_monitor.txt'
+rt_monitor_file = 'rt_monitor-exp1.txt'
 
 # set terminal aqua size 625,250
 set multiplot layout 3, 1 title "SAVI-IoT Platform -- CORE"

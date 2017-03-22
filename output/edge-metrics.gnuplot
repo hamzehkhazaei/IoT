@@ -1,6 +1,6 @@
 reset
 
-monitor_file = 'monitor.txt'
+monitor_file = 'monitor-exp1.txt'
 
 # set terminal aqua size 625,250
 set multiplot layout 3, 1 title "SAVI-IoT Platform -- Edges"

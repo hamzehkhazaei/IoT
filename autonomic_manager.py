@@ -541,17 +541,19 @@ if __name__ == "__main__":
     monitor_thread = StartMonitoringThread()
     monitor_thread.setDaemon(True)  # this way, whenever the main program exit, monitoring thread will stop as well.
     monitor_thread.start()
-    time.sleep(3)
+    time.sleep(2)
     modify = 1
-    while True:
+    count = 1
+    while count <= 2:
         scale_kafka_service("wt-agg", modify)
         time.sleep(1)
         scale_kafka_service("cg-agg", modify)
         time.sleep(1)
-        scale_kafka_service("ct-agg", modify)
+        scale_kafka_service("mg-agg", modify)
         time.sleep(1)
         scale_kafka_service("core-agg", modify)
         time.sleep(2)
+        count += 1
         # scale_kafka_service("vc-agg", 1)
         # scale_kafka_service("wt-agg", 1)
         # time.sleep(0.5)
