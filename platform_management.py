@@ -403,7 +403,7 @@ def deploy_spark_cluster():
                "-e", "NODE_TYPE=master",
                "-p", "7077:7077", "-p", "8080:8080",
                "--reserve-memory", spark_memory_reserve, "--limit-memory", spark_memory_limit,
-               "gettyimages/spark:2.0.2-hadoop-2.7", "bin/spark-class", "org.apache.spark.deploy.master.Master"]
+               "gettyimages/spark:2.1.0-hadoop-2.7", "bin/spark-class", "org.apache.spark.deploy.master.Master"]
 
     result = master_shell.run(command, store_pid="True", allow_error=True, encoding="utf8")
     if result.return_code > 0:
@@ -415,12 +415,14 @@ def deploy_spark_cluster():
                    "--network", spark_overlay_network_name,
                    "--constraint", "node.labels.loc==" + regions_name[i],
                    "--constraint", "node.labels.role==" + edge_worker_role,
-                   # "-p", "808" + str(i + 1) + ":8080",
+                   "-p", "808" + str(i + 1) + ":8080",
                    "-e", "NODE_TYPE=slave",
                    "--reserve-memory", spark_memory_reserve,
-                   "--limit-memory", spark_memory_limit, "gettyimages/spark:2.0.2-hadoop-2.7", "bin/spark-class",
+                   "--limit-memory", spark_memory_limit, "gettyimages/spark:2.1.0-hadoop-2.7", "bin/spark-class",
                    "org.apache.spark.deploy.worker.Worker",
                    "spark://" + get_spark_master_ip("master") + ":7077"]
+        # this returns a wrong ip address on spark overlay network.
+        # "spark://" + swarm_master_ip + ":7077"]
         result = master_shell.run(command, store_pid="True", allow_error=True, encoding="utf8")
         if result.return_code > 0:
             print(result.stderr_output)
@@ -499,7 +501,7 @@ def deploy_vis_monomarks():
     if result.return_code > 0:
         print(result.stderr_output)
     else:
-        print("\nIoT Platform Console:", "http://" + swarm_master_ip + ":5000")
+        print("\nIoT Platform Console:", "http://" + swarm_master_ip + ":5000\n")
 
 
 def deploy_vis_weave():
@@ -820,4 +822,5 @@ if __name__ == "__main__":
     # hard_remove_iot_platform()
     # print(get_region_and_status("core-agg"))
     # deploy_vis_weave()
+    # print(get_spark_master_ip("master"))
     # print(get_spark_master_ip("master"))
