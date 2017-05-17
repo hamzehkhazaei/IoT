@@ -30,6 +30,9 @@ tenant_name = "demo2"
 ssh_user = "ubuntu"
 controller_ip = "127.0.0.1"  # this machine is the default controller on which we access cloud;
 # it has docker-machine installed.
+controller_name = 'iot-controller'
+privatekey_path_macos = '/Users/hamzeh/.docker/machine/machines/'
+privatekey_path_ubuntu = '/home/ubuntu/.docker/machine/machines/'
 security_group = "savi-iot"
 
 # Swarm info
@@ -137,7 +140,7 @@ def ssh_to(ip='127.0.0.1', user_name='', node_name='', mode='', passphrase=''):
         shell = spur.SshShell(
             hostname=ip,
             username=user_name,
-            private_key_file="/Users/hamzeh/.docker/machine/machines/" + node_name + "/id_rsa",
+            private_key_file=privatekey_path_macos + node_name + "/id_rsa",
             missing_host_key=spur.ssh.MissingHostKey.accept
         )
     elif mode == 'password':
@@ -209,8 +212,10 @@ class CreateVMThread(threading.Thread):
 
 
 def provision_iot_controller(driver='', ip=''):
-    global master_shell
+    global controller_shell
     shell = ssh_to(ip='127.0.0.1')
+    print("\nCreating IoT controller on the CORE cloud ...")
+
     try:
         result = shell.run(["docker-machine", "help"], store_pid="True", allow_error=True, encoding='utf8')
         result = shell.run(["docker", "help"], store_pid="True", allow_error=True, encoding='utf8')
@@ -218,9 +223,9 @@ def provision_iot_controller(driver='', ip=''):
         print("You need to install Docker-Machine and/or Docker on your local machine manually.")
 
     if driver == 'openstack':
-        create_vm('iot-controller', user, small_flavor, ubuntu16, core, driver='openstack')
-        iot_controller_ip = get_node_ip('iot-controller')
-        iot_controller_shell = ssh_to(iot_controller_ip, 'ubuntu', 'iot-controller', mode='key')
+        create_vm(controller_name, user, small_flavor, ubuntu16, 'CORE', driver='openstack')
+        iot_controller_ip = get_node_ip(controller_name)
+        iot_controller_shell = ssh_to(iot_controller_ip, 'ubuntu', controller_name, mode='key')
         try:  # installing docker-machine
             iot_controller_shell.run(["wget",
                                       "https://github.com/docker/machine/releases/download/v0.10.0/docker-machine-Linux-x86_64"],
@@ -231,11 +236,18 @@ def provision_iot_controller(driver='', ip=''):
                                      allow_error=True, encoding='utf8')
             iot_controller_shell.run(["sudo", "mv", "./docker-machine", "/usr/local/bin/"],
                                      store_pid="True", allow_error=True, encoding='utf8')
+            iot_controller_shell.run(["sudo", "apt", "-y", "install", "python-pip", "python-dev", "libffi-dev",
+                                      "libssl-dev", "libxml2-dev", "libxslt1-dev", "libjpeg8-dev", "zlib1g-dev"],
+                                     store_pid="True", allow_error=True, encoding='utf8')
+            iot_controller_shell.run(["sudo", "pip", "install", "spur"],
+                                     store_pid="True", allow_error=True, encoding='utf8')
         except Exception as inst:
             print("Something went wrong when provisioning IoT controller.")
             print(inst.args)
         # here we set the IoT controller to the machine on the CORE Cloud
-        master_shell = ssh_to(iot_controller_ip, 'ubuntu', 'iot-controller', mode='key')
+        controller_shell = ssh_to(iot_controller_ip, 'ubuntu', controller_name, mode='key')
+        print("\nIoT controller has been created ...")
+
 
     elif driver == 'generic':  # use the ip address
         # todo: to be implemented later.
@@ -816,17 +828,17 @@ def create_iot_platform():
     t1 = time.time()
     init(is_creation_time=True)
     monitor.init_monitoring()
-    provision_iot_controller(driver='openstack')
+    # provision_iot_controller(driver='openstack')
     provision_cluster()
     swarm_master_ip = get_swarm_master_ip()  # we know which node is gonna be the master by its name.
     create_swarm_cluster()
     label_nodes()
-    deploy_spark_cluster()
-    deploy_kafka()
-    deploy_rabbitmq()
-    deploy_cassandra()
+    # deploy_spark_cluster()
+    # deploy_kafka()
+    # deploy_rabbitmq()
+    # deploy_cassandra()
     deploy_vis_monomarks()
-    deploy_vis_weave()
+    # deploy_vis_weave()
     t2 = time.time()
     print("\n\nInfrastructure has been provisioned in (seconds): ", t2 - t1)
 

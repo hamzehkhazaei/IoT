@@ -3,13 +3,13 @@ monitor_file = 'monitor-exp1.txt'
 rt_monitor_file = 'rt_monitor-exp1.txt'
 
 # set terminal aqua size 625,250
-set multiplot layout 3, 1 title "SAVI-IoT Platform -- CORE"
+set multiplot layout 3, 1 # title "SAVI-IoT Platform -- CORE"
 set termoption dashed
 
 # set xlabel "Time" font "Arial, 10"
 set ytics nomirror
-set tics font "Arial, 10"
-set key font "Arial, 10" below
+set tics font "Arial, 12"
+set key font "Arial, 12" below
 
 
 # set obj rectangle from 1881, graph 0 to 1900, graph 1    behind fillcolor rgb "#EEEEEE" fillstyle solid 1 noborder
@@ -45,12 +45,12 @@ set grid front ytics layerdefault linetype 1 dt 4 linewidth 1.000 linecolor rgb 
 # set obj rectangle from 0,0 to 12,12 behind fillcolor rgb "#CCCCCC" fillstyle solid 1 noborder
 # set obj rectangle from 0,572 to 2000, 2000 behind fillcolor rgb "#E5A385" fillstyle solid 1 noborder
 
-set xrange [0:180]
+set xrange [0:150]
 set xtics 10
 
 set size 0.91, 0.3
-set ylabel "VMs (#)" font "Arial, 10" offset 2
-set format y "%2.0f"
+set ylabel "VMs (#)" font "Arial, 12" offset 2
+set format y "%3.0f"
 set ytics 1
 set yrange [0:4]
 plot    monitor_file using 2 with lines axis x1y1 linestyle 1 title "CORE-Spark-VM", \
@@ -58,8 +58,8 @@ plot    monitor_file using 2 with lines axis x1y1 linestyle 1 title "CORE-Spark-
         monitor_file using 10 with lines axis x1y1 linestyle 3 title "CORE-Cassandra-VM", \
         
 set size 0.91, 0.3
-set ylabel "Containers (#)" font "Arial, 10" offset 2
-set format y "%2.0f"
+set ylabel "Containers (#)" font "Arial, 12" offset 2
+set format y "%3.0f"
 set ytics 2
 set yrange [0:14]
 plot    monitor_file using 11 with lines axis x1y1 linestyle 11 title "CORE-Spark-Cont", \
@@ -67,23 +67,23 @@ plot    monitor_file using 11 with lines axis x1y1 linestyle 11 title "CORE-Spar
         monitor_file using 19 with lines axis x1y1 linestyle 13 title "CORE-Cassandra-Cont", \
 
 
-set xrange [0:70]
+set xrange [30:70]
 set size 0.99, 0.33
 set boxwidth 0.2
 set style fill solid
-set ylabel "VM-RT (sec)" font "Arial, 10" offset 2
-set y2label "Cont-RT (ms)" font "Arial, 10" offset -1
+set ylabel "VM-RT (sec)" font "Arial, 12" offset 2
+set y2label "Cont-RT (ms)" font "Arial, 12" offset -1
 set format y "%2.0f"
 set yrange [0:300]
 set ytics 50
 set y2range [0:600]
 set y2tics 100
-set xtics border in scale 0,0 nomirror rotate by -45  autojustify font "Arial, 8"
+set xtics border in scale 0,0 nomirror rotate by -45  autojustify font "Arial, 12"
 set xtics  norangelimit 
 set xtics   ()
         
-plot    rt_monitor_file using 2:xtic(4) with boxes axis x1y1 title "VM Response Time", \
-        rt_monitor_file using ($3)*1000:xtic(5) with boxes axis x1y2 title "Container Response Time", \
+plot    rt_monitor_file using 2:xtic(4) with boxes axis x1y1 title "Macroservice Provisioning Time", \
+        rt_monitor_file using ($3)*1000:xtic(5) with boxes axis x1y2 title "Microservice Provisioning Time", \
 
         
 unset multiplot
