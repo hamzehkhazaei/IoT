@@ -15,7 +15,7 @@ from util import Util
 
 # Autonomic Manager info
 auth_url = "http://iam.savitestbed.ca:5000/v2.0"
-driver = "openstack"
+# driver = "openstack"
 user = "hamzeh"
 password = "ham01nas"
 
@@ -28,7 +28,8 @@ ubuntu14 = "Ubuntu-14-04"
 ubuntu16 = "Ubuntu-16-04"
 tenant_name = "demo2"
 ssh_user = "ubuntu"
-controller_ip = "127.0.0.1"  # this machine is the controller on which we access cloud; it has docker-machine installed.
+controller_ip = "127.0.0.1"  # this machine is the default controller on which we access cloud;
+# it has docker-machine installed.
 security_group = "savi-iot"
 
 # Swarm info
@@ -104,7 +105,7 @@ def init(is_creation_time=False, local=False):
     controller_shell = ssh_to(controller_ip)
     if not is_creation_time and not local:
         swarm_master_ip = get_swarm_master_ip()
-        master_shell = ssh_to(swarm_master_ip, user_name='ubuntu', node_name=swarm_master_name)
+        master_shell = ssh_to(swarm_master_ip, user_name='ubuntu', node_name=swarm_master_name, mode='key')
     elif local:
         master_shell = ssh_to(controller_ip)
     load_initial_nodes_name()
@@ -117,8 +118,10 @@ def load_initial_nodes_name():
     initial_db_name = util.load_initial_datastore_node_names()
 
 
-def ssh_to(ip='127.0.0.1', user_name='', node_name=''):
+def ssh_to(ip='127.0.0.1', user_name='', node_name='', mode='', passphrase=''):
     """Connect to the IoT controller to setup the cluster
+        :param passphrase:
+        :param mode: could be key or password based authentication
         :param node_name: the name of the node; this one is used to find the private key
         :param user_name: for ssh connection
         :param ip: is the ip or host name of the machine
@@ -130,13 +133,23 @@ def ssh_to(ip='127.0.0.1', user_name='', node_name=''):
         # result = shell.run(["sudo", ".", "savi-hamzeh", user, "demo2", core], allow_error=True, encoding='utf8')
         # if result.return_code > 0:
         #     print("\n***" + result.stderr_output)
-    else:
+    elif mode == 'key':
         shell = spur.SshShell(
             hostname=ip,
             username=user_name,
             private_key_file="/Users/hamzeh/.docker/machine/machines/" + node_name + "/id_rsa",
             missing_host_key=spur.ssh.MissingHostKey.accept
         )
+    elif mode == 'password':
+        shell = spur.SshShell(
+            hostname=ip,
+            username=user_name,
+            password=passphrase
+        )
+
+    else:
+        print('SSH has not been stabilised.')
+        return
     result = shell.run(["hostname", "-fs"], allow_error=True, encoding='utf8')
 
     if result.return_code > 0:
@@ -144,18 +157,28 @@ def ssh_to(ip='127.0.0.1', user_name='', node_name=''):
     return shell
 
 
-def create_vm(vm_name, user_name, flavor, image, region):
-    """Connect to the backend cloud service provider
-    the cloud provider could be any driver supported by docker-machine
+def create_vm(vm_name, user_name, flavor, image, region, driver='openstack', ip=''):
     """
-    result = controller_shell.run(
-        ["docker-machine", "create", "--driver", "openstack", "--openstack-auth-url", auth_url,
-         "--openstack-insecure", "--openstack-username", user_name,
-         "--openstack-password", password,
-         "--openstack-flavor-name", flavor, "--openstack-image-name", image,
-         "--openstack-tenant-name", tenant_name, "--openstack-region", region,
-         "--openstack-sec-groups", security_group, "--openstack-ssh-user", ssh_user, vm_name],
-        store_pid="True", allow_error=True, encoding="utf8")
+    Connect to the backend cloud service provider
+    the cloud provider could be any driver supported by docker-machine
+    :type driver: str supported as of now are: openstack and generic
+    """
+    if driver == 'openstack':
+        result = controller_shell.run(
+            ["docker-machine", "create", "--driver", driver, "--openstack-auth-url", auth_url,
+             "--openstack-insecure", "--openstack-username", user_name,
+             "--openstack-password", password,
+             "--openstack-flavor-name", flavor, "--openstack-image-name", image,
+             "--openstack-tenant-name", tenant_name, "--openstack-region", region,
+             "--openstack-sec-groups", security_group, "--openstack-ssh-user", ssh_user, vm_name],
+            store_pid="True", allow_error=True, encoding="utf8")
+
+    elif driver == 'generic':
+        result = controller_shell.run(
+            ["docker-machine", "create", "--driver", driver, "--generic-ip-address=" + ip,
+             "--generic-ssh-key", key, "--generic-ssh-user", user_name],
+            store_pid="True", allow_error=True, encoding="utf8")
+
     if result.return_code > 0:
         print(result.stderr_output)
 
@@ -183,6 +206,40 @@ class CreateVMThread(threading.Thread):
         print(self.vm_name + " is being provisioned ...")
         create_vm(self.vm_name, self.user_name, self.flavor, self.image, self.region)
         print(self.vm_name + " is up and running with latest docker engine ...")
+
+
+def provision_iot_controller(driver='', ip=''):
+    global master_shell
+    shell = ssh_to(ip='127.0.0.1')
+    try:
+        result = shell.run(["docker-machine", "help"], store_pid="True", allow_error=True, encoding='utf8')
+        result = shell.run(["docker", "help"], store_pid="True", allow_error=True, encoding='utf8')
+    except:
+        print("You need to install Docker-Machine and/or Docker on your local machine manually.")
+
+    if driver == 'openstack':
+        create_vm('iot-controller', user, small_flavor, ubuntu16, core, driver='openstack')
+        iot_controller_ip = get_node_ip('iot-controller')
+        iot_controller_shell = ssh_to(iot_controller_ip, 'ubuntu', 'iot-controller', mode='key')
+        try:  # installing docker-machine
+            iot_controller_shell.run(["wget",
+                                      "https://github.com/docker/machine/releases/download/v0.10.0/docker-machine-Linux-x86_64"],
+                                     store_pid="True", allow_error=True, encoding='utf8')
+            iot_controller_shell.run(["chmod", "+x", "./docker-machine-Linux-x86_64"], store_pid="True",
+                                     allow_error=True, encoding='utf8')
+            iot_controller_shell.run(["mv", "./docker-machine-Linux-x86_64", "./docker-machine"], store_pid="True",
+                                     allow_error=True, encoding='utf8')
+            iot_controller_shell.run(["sudo", "mv", "./docker-machine", "/usr/local/bin/"],
+                                     store_pid="True", allow_error=True, encoding='utf8')
+        except Exception as inst:
+            print("Something went wrong when provisioning IoT controller.")
+            print(inst.args)
+        # here we set the IoT controller to the machine on the CORE Cloud
+        master_shell = ssh_to(iot_controller_ip, 'ubuntu', 'iot-controller', mode='key')
+
+    elif driver == 'generic':  # use the ip address
+        # todo: to be implemented later.
+        print()
 
 
 def provision_cluster():
@@ -244,7 +301,7 @@ def get_token_and_master_ip_port():
 
 def join_node_to_swarm_cluster(node_ip, node_name):
     token, master_ip_port = get_token_and_master_ip_port()
-    shell = ssh_to(ip=node_ip, user_name='ubuntu', node_name=node_name)
+    shell = ssh_to(ip=node_ip, user_name='ubuntu', node_name=node_name, mode='key')
     with shell:
         result = shell.run(["sudo", "docker", "swarm", "join", "--token", token, master_ip_port],
                            store_pid="True", allow_error=True, encoding="utf8")
@@ -261,7 +318,7 @@ def create_swarm_cluster():
     load_initial_aggs_ip()
     load_initial_ds_ip()
 
-    master_shell = ssh_to(swarm_master_ip, user_name='ubuntu', node_name=swarm_master_name)
+    master_shell = ssh_to(swarm_master_ip, user_name='ubuntu', node_name=swarm_master_name, mode='key')
 
     result = master_shell.run(["sudo", "docker", "swarm", "init"], store_pid="True", encoding="utf8")
     if result.return_code > 0:
@@ -397,7 +454,8 @@ def deploy_spark_cluster():
     print("\nDeploying the Spark cluster ...")
     err_flag = False
     create_overlay_network(spark_overlay_network_name)
-    command = ["sudo", "docker", "service", "create", "--name", "master", "--hostname", swarm_master_name,
+    command = ["sudo", "docker", "service", "create", "--name", "master",
+               "--hostname", swarm_master_name,
                "--network", spark_overlay_network_name,
                "--constraint", "node.labels.role==" + manager_role,
                "-e", "NODE_TYPE=master",
@@ -421,8 +479,8 @@ def deploy_spark_cluster():
                    "--limit-memory", spark_memory_limit, "gettyimages/spark:2.1.0-hadoop-2.7", "bin/spark-class",
                    "org.apache.spark.deploy.worker.Worker",
                    "spark://" + get_spark_master_ip("master") + ":7077"]
-        # this returns a wrong ip address on spark overlay network.
-        # "spark://" + swarm_master_ip + ":7077"]
+        # "spark://master:7077"]
+
         result = master_shell.run(command, store_pid="True", allow_error=True, encoding="utf8")
         if result.return_code > 0:
             print(result.stderr_output)
@@ -509,18 +567,13 @@ def deploy_vis_weave():
     init(is_creation_time=False)
     thread = [ConnectToWeaveThread(swarm_master_ip, swarm_master_name, is_swarm_master=True)]
 
-    # connect_node_to_weave(get_node_ip(swarm_master_name), swarm_master_name, is_swarm_master=True)
-
     for worker_name in initial_workers_name:
-        # connect_node_to_weave(get_node_ip(worker_name), worker_name)
         thread.append(ConnectToWeaveThread(get_node_ip(worker_name), worker_name))
 
     for agg_name in initial_aggs_name:
-        # connect_node_to_weave(get_node_ip(agg_name), agg_name)
         thread.append(ConnectToWeaveThread(get_node_ip(agg_name), agg_name))
 
     for db_name in initial_db_name:
-        # connect_node_to_weave(get_node_ip(db_name), db_name)
         thread.append(ConnectToWeaveThread(get_node_ip(db_name), db_name))
 
     for i in range(0, len(thread)):
@@ -544,7 +597,7 @@ class ConnectToWeaveThread(threading.Thread):
 
 
 def connect_node_to_weave(node_ip, node_name, is_swarm_master=False):
-    shell = ssh_to(node_ip, ssh_user, node_name)
+    shell = ssh_to(node_ip, ssh_user, node_name, mode='key')
     with shell:
         result = shell.run(["sudo", "curl", "-L", "git.io/scope", "-o", "/usr/local/bin/scope"],
                            store_pid="True", allow_error=True, encoding="utf8")
@@ -619,7 +672,7 @@ def get_no_replicas(service_name):
 def get_spark_master_ip(service_name):
     service_info = inspect_service(service_name, sudo=True)
     service_json = json.loads(service_info, encoding='utf8')
-    master_ip = str(service_json[0]['Endpoint']['VirtualIPs'][1]['Addr']).split('/')[0]
+    master_ip = str(service_json[0]['Endpoint']['VirtualIPs'][0]['Addr']).split('/')[0]
     return master_ip
 
 
@@ -684,7 +737,7 @@ def remove_swarm_node(node_name, node_ip=""):
     if node_ip == "":
         node_ip = get_node_ip(node_name)
 
-    shell = ssh_to(node_ip, user_name='ubuntu', node_name=node_name)
+    shell = ssh_to(node_ip, user_name='ubuntu', node_name=node_name, mode='key')
     result = shell.run(["sudo", "docker", "swarm", "leave"], store_pid="True", allow_error=True, encoding="utf8")
     if result.return_code > 0:
         print_red(result.stderr_output)
@@ -763,6 +816,7 @@ def create_iot_platform():
     t1 = time.time()
     init(is_creation_time=True)
     monitor.init_monitoring()
+    provision_iot_controller(driver='openstack')
     provision_cluster()
     swarm_master_ip = get_swarm_master_ip()  # we know which node is gonna be the master by its name.
     create_swarm_cluster()
@@ -814,9 +868,10 @@ def hard_remove_iot_platform():
 
 
 if __name__ == "__main__":
-    # init(False, local=False)
-    create_iot_platform()
-    # remove_iot_platform()
+    # init(True, local=False)
+    # provision_iot_controller('openstack')
+    # create_iot_platform()
+    remove_iot_platform()
     # redeploy_services()
     # down_scale_swarm_cluster_to_initial_state()
     # hard_remove_iot_platform()
