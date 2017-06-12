@@ -17,7 +17,7 @@ from util import Util
 auth_url = "http://iam.savitestbed.ca:5000/v2.0"
 # driver = "openstack"
 user = "hamzeh"
-password = "password"
+password = "ham01nas"
 
 small_flavor = "m1.small"
 medium_flavor = "m1.medium"
@@ -41,6 +41,8 @@ swarm_master_ip = ""
 core_worker_role = "iot-core-worker"
 edge_worker_role = "iot-edge-worker"
 manager_role = "manager"
+
+locations_name = ["Toronto", "Chicago", "Waterloo", "Montreal"]
 
 # Spark info
 #  do not change this, as other names don't work.
@@ -236,11 +238,14 @@ def provision_iot_controller(driver='', ip=''):
                                      allow_error=True, encoding='utf8')
             iot_controller_shell.run(["sudo", "mv", "./docker-machine", "/usr/local/bin/"],
                                      store_pid="True", allow_error=True, encoding='utf8')
-            iot_controller_shell.run(["sudo", "apt", "-y", "install", "python-pip", "python-dev", "libffi-dev",
+            iot_controller_shell.run(["sudo", "rm", "-fr", "./docker/machine/certs"],
+                                     store_pid="True", allow_error=True, encoding='utf8')
+            iot_controller_shell.run(["sudo", "apt", "-y", "install", "python3-pip", "python-dev", "libffi-dev",
                                       "libssl-dev", "libxml2-dev", "libxslt1-dev", "libjpeg8-dev", "zlib1g-dev"],
                                      store_pid="True", allow_error=True, encoding='utf8')
-            iot_controller_shell.run(["sudo", "pip", "install", "spur"],
+            iot_controller_shell.run(["sudo", "pip3", "install", "spur"],
                                      store_pid="True", allow_error=True, encoding='utf8')
+
         except Exception as inst:
             print("Something went wrong when provisioning IoT controller.")
             print(inst.args)
@@ -393,14 +398,14 @@ def label_a_node(node_name, loc='', role=''):
 
 
 def label_nodes():
-    label_a_node(swarm_master_name, loc=core, role=manager_role)
+    label_a_node(swarm_master_name, loc=locations_name[0], role=manager_role)
     for i in range(0, len(regions_name)):
-        label_a_node(initial_workers_name[i], loc=regions_name[i], role=edge_worker_role)
-        label_a_node(initial_aggs_name[i], loc=regions_name[i], role=agg_role)
+        label_a_node(initial_workers_name[i], loc=locations_name[i], role=edge_worker_role)
+        label_a_node(initial_aggs_name[i], loc=locations_name[i], role=agg_role)
         print("Role and Location labels have been updated.")
 
     for i in range(0, len(initial_db_name)):
-        label_a_node(initial_db_name[i], loc=core, role=ds_role)
+        label_a_node(initial_db_name[i], loc=locations_name[0], role=ds_role)
 
 
 def get_swarm_master_ip():
@@ -483,7 +488,7 @@ def deploy_spark_cluster():
     for i in range(0, len(initial_workers_name)):
         command = ["sudo", "docker", "service", "create", "--name", initial_workers_name[i],
                    "--network", spark_overlay_network_name,
-                   "--constraint", "node.labels.loc==" + regions_name[i],
+                   "--constraint", "node.labels.loc==" + locations_name[i],
                    "--constraint", "node.labels.role==" + edge_worker_role,
                    "-p", "808" + str(i + 1) + ":8080",
                    "-e", "NODE_TYPE=slave",
@@ -513,7 +518,7 @@ def deploy_kafka():
     for i in range(0, len(initial_aggs_name)):
         result = master_shell.run(
             ["sudo", "docker", "service", "create", "--name", initial_aggs_name[i], "--constraint",
-             "node.labels.loc==" + regions_name[i], "--constraint", "node.labels.role==" + agg_role, "-p",
+             "node.labels.loc==" + locations_name[i], "--constraint", "node.labels.role==" + agg_role, "-p",
              "218" + str(i) + ":2180", "-p", "909" + str(i) + ":9090", "--env",
              "ADVERTISED_HOST=" + initial_aggs_ip[i],
              "--env", "ADVERTISED_PORT=" + "909" + str(i), "--reserve-memory", kafka_memory_reserve,
@@ -536,7 +541,7 @@ def deploy_cassandra():
     for i in range(0, len(initial_db_name)):
         command = ["sudo", "docker", "service", "create", "--name", initial_db_name[i],
                    "--network", cassandra_overlay_network_name,
-                   "--constraint", "node.labels.loc==" + core, "--constraint", "node.labels.role==" + ds_role,
+                   "--constraint", "node.labels.loc==" + locations_name[0], "--constraint", "node.labels.role==" + ds_role,
                    "--reserve-memory", cassandra_memory_reserve, "--limit-memory", cassandra_memory_limit, "cassandra"]
         result = master_shell.run(command, store_pid="True", allow_error=True, encoding="utf8")
         if result.return_code > 0:
@@ -609,7 +614,10 @@ class ConnectToWeaveThread(threading.Thread):
 
 
 def connect_node_to_weave(node_ip, node_name, is_swarm_master=False):
-    shell = ssh_to(node_ip, ssh_user, node_name, mode='key')
+    if str(node_name).__contains__("ch-agg") or str(node_name).__contains__("ch-worker"):
+        shell = ssh_to(node_ip, "cc", node_name, mode='key')
+    else:
+        shell = ssh_to(node_ip, ssh_user, node_name, mode='key')
     with shell:
         result = shell.run(["sudo", "curl", "-L", "git.io/scope", "-o", "/usr/local/bin/scope"],
                            store_pid="True", allow_error=True, encoding="utf8")
@@ -833,14 +841,14 @@ def create_iot_platform():
     swarm_master_ip = get_swarm_master_ip()  # we know which node is gonna be the master by its name.
     create_swarm_cluster()
     label_nodes()
-    # deploy_spark_cluster()
-    # deploy_kafka()
-    # deploy_rabbitmq()
-    # deploy_cassandra()
+    deploy_spark_cluster()
+    deploy_kafka()
+    deploy_rabbitmq()
+    deploy_cassandra()
     deploy_vis_monomarks()
-    # deploy_vis_weave()
+    deploy_vis_weave()
     t2 = time.time()
-    print("\n\nInfrastructure has been provisioned in (seconds): ", t2 - t1)
+    print("\n\nApplication has been deployed in (seconds): ", t2 - t1)
 
 
 # removes the IoT platform carelessly. Use with care.
@@ -883,10 +891,10 @@ if __name__ == "__main__":
     # init(True, local=False)
     # provision_iot_controller('openstack')
     # create_iot_platform()
-    remove_iot_platform()
+    # remove_iot_platform()
     # redeploy_services()
     # down_scale_swarm_cluster_to_initial_state()
-    # hard_remove_iot_platform()
+    hard_remove_iot_platform()
     # print(get_region_and_status("core-agg"))
     # deploy_vis_weave()
     # print(get_spark_master_ip("master"))

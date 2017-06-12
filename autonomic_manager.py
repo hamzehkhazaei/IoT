@@ -7,8 +7,8 @@ import time
 import pika
 import spur
 
-from monitor import StartMonitoringThread, log_rt_metrics
-from platform_management import connect_node_to_wavecloud
+from monitor import log_rt_metrics
+from platform_management import connect_node_to_weave
 from util import Util
 
 auth_url = "http://iam.savitestbed.ca:5000/v2.0"
@@ -420,7 +420,7 @@ class ProvisionSwarmNodeThread(threading.Thread):
             create_vm(self.vm_name, self.user_name, self.flavor, self.image, self.region)
             join_node_to_swarm_cluster(get_node_ip(self.vm_name), self.vm_name)
             label_a_node(self.vm_name, self.region, self.role)
-            connect_node_to_wavecloud(get_node_ip(self.vm_name), self.vm_name)
+            connect_node_to_weave(get_node_ip(self.vm_name), self.vm_name)
             print_cyan(self.vm_name + " is up and running with latest docker engine ...")
 
             if self.role == edge_worker_role:
@@ -524,6 +524,19 @@ def handle_arrival_request(body):
         print("Bad Request:")
 
 
+# returns a json file including the spec of the machine
+def inspect_a_machine(machine_name):
+    result = controller_shell.run(["docker-machine", "inspect", machine_name], store_pid="True", allow_error=True,
+                                  encoding="utf8")
+    if result.return_code > 0:
+        print(result.stderr_output)
+        return ""
+    else:
+        res = str(result.output)
+        res_json = json.loads(res, encoding="utf8")
+        print(res_json['Driver']['AuthUrl'])
+
+
 def start_am():
     init()
     connection = pika.BlockingConnection(pika.ConnectionParameters(host=controller_ip))
@@ -536,27 +549,29 @@ def start_am():
 
 
 if __name__ == "__main__":
-    # start_am()
     init()
-    monitor_thread = StartMonitoringThread()
-    monitor_thread.setDaemon(True)  # this way, whenever the main program exit, monitoring thread will stop as well.
-    monitor_thread.start()
-    time.sleep(2)
-    modify = 1
-    count = 1
-    while count <= 2:
-        scale_kafka_service("wt-agg", modify)
-        time.sleep(1)
-        scale_kafka_service("cg-agg", modify)
-        time.sleep(1)
-        scale_kafka_service("mg-agg", modify)
-        time.sleep(1)
-        scale_kafka_service("core-agg", modify)
-        time.sleep(2)
-        count += 1
-        # scale_kafka_service("vc-agg", 1)
-        # scale_kafka_service("wt-agg", 1)
-        # time.sleep(0.5)
-        # print(find_candidate_for_deleting("wt-agg"))
-        # print(get_all_agg_replicas())
-        # down_scale_swarm_cluster_to_initial_state()
+    inspect_a_machine("wt-agg")
+    # start_am()
+    # init()
+    # monitor_thread = StartMonitoringThread()
+    # monitor_thread.setDaemon(True)  # this way, whenever the main program exit, monitoring thread will stop as well.
+    # monitor_thread.start()
+    # time.sleep(2)
+    # modify = 1
+    # count = 1
+    # while count <= 2:
+    #     scale_kafka_service("wt-agg", modify)
+    #     time.sleep(1)
+    #     scale_kafka_service("cg-agg", modify)
+    #     time.sleep(1)
+    #     scale_kafka_service("mg-agg", modify)
+    #     time.sleep(1)
+    #     scale_kafka_service("core-agg", modify)
+    #     time.sleep(2)
+    #     count += 1
+    #     # scale_kafka_service("vc-agg", 1)
+    #     # scale_kafka_service("wt-agg", 1)
+    #     # time.sleep(0.5)
+    #     # print(find_candidate_for_deleting("wt-agg"))
+    #     # print(get_all_agg_replicas())
+    #     # down_scale_swarm_cluster_to_initial_state()
