@@ -5,6 +5,7 @@
 # message = 'say ' + msg
 # os.system(message)
 import docker
+print('test sync between github and gitlab')
 
 client = docker.from_env()
 # client.containers.run("ubuntu", "echo hello world")
