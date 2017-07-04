@@ -6,5 +6,5 @@
     * This will create the sample application with initial configuration. 
 * For auto-scalability go to ```autonomic_manager.py``` and configure the program add more
  sensors to the application. 
-* The default auto-scaler algorithm scales all service accordingly.
+* The default auto-scaler algorithm scales all services accordingly.
 
