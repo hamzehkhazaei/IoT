@@ -890,11 +890,11 @@ def hard_remove_iot_platform():
 if __name__ == "__main__":
     # init(True, local=False)
     # provision_iot_controller('openstack')
-    # create_iot_platform()
+    create_iot_platform()
     # remove_iot_platform()
     # redeploy_services()
     # down_scale_swarm_cluster_to_initial_state()
-    hard_remove_iot_platform()
+    # hard_remove_iot_platform()
     # print(get_region_and_status("core-agg"))
     # deploy_vis_weave()
     # print(get_spark_master_ip("master"))
