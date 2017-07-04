@@ -17,7 +17,7 @@ from util import Util
 auth_url = "http://iam.savitestbed.ca:5000/v2.0"
 # driver = "openstack"
 user = "hamzeh"
-password = "ham01nas"
+password = "password"
 
 small_flavor = "m1.small"
 medium_flavor = "m1.medium"
